@@ -1,11 +1,20 @@
 spring:
   profiles:
     active: dev
+  web:
+    error:
+      include-message: always
+
+  jackson:
+    default-property-inclusion: non_null
 
 app:
-  name: Task Manager Pro
-  max-tasks: 5
+  name: Task Manager API
+  max-tasks: 10
   default-priority: MEDIUM
+
+server:
+  port: 8080
 
 ---
 spring:

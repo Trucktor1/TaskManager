@@ -7,7 +7,6 @@ import org.springframework.context.ConfigurableApplicationContext;
 @SpringBootApplication
 public class TaskManagerApplication {
     public static void main(String[] args) {
-        ConfigurableApplicationContext context = SpringApplication.run(TaskManagerApplication.class, args);
-        context.registerShutdownHook();
+        SpringApplication.run(TaskManagerApplication.class, args);
     }
 }
