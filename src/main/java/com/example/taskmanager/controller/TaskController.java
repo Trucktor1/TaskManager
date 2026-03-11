@@ -89,4 +89,11 @@ public class TaskController {
     public Map<String, Long> getStats() {
         return taskService.getStats();
     }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<Task>> searchTasks(@RequestParam String keyword) {
+        List<Task> tasks = taskService.searchByKeyword(keyword);
+        return ResponseEntity.ok(tasks);
+    }
+    
 }
