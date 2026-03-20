@@ -1,6 +1,8 @@
 package com.example.taskmanager.service;
 
-import com.example.taskmanager.model.Task;
+import com.example.taskmanager.dto.TaskRequest;
+import com.example.taskmanager.dto.TaskResponse;
+import com.example.taskmanager.model.Task.Status;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
@@ -8,23 +10,22 @@ import java.util.Map;
 import java.util.Optional;
 
 public interface TaskService {
-    Task createTask(String title, String description, Task.Priority priority);
-    List<Task> getAllTasks();
-    Page<Task> getAllTasksPaged(int page, int size, String sortBy,  String sortDirection);
-    Optional<Task> findById(Long id);
-    Task update(Long id, Task task);
+    TaskResponse createTask(TaskRequest request);
+    List<TaskResponse> getAllTasks();
+    Page<TaskResponse> getAllTasksPaged(int page, int size, String sortBy, String direction);
+    Optional<TaskResponse> findById(Long id);
+    Optional<TaskResponse> update(Long id, TaskRequest request);
     void delete(Long id);
 
-    List<Task> getTasksByStatus(Task.Status status);
-    List<Task> getTasksByPriority(Task.Priority priority);
-    List<Task> getAllWithFilters(String status, String priority);
+    List<TaskResponse> getTasksByStatus(Status status);
+    List<TaskResponse> getTasksByPriority(String priority);
+    List<TaskResponse> getAllWithFilters(String status, String priority);
 
-    void updateTaskStatus(Long id, Task.Status status);
+    void updateTaskStatus(Long id, Status status);
 
     long getTaskCount();
     Map<String, Long> getStats();
-    List<Task> searchByKeyword(String keyword);
-    Map<String, Long> getTodayStats();
+    List<TaskResponse> searchByKeyword(String keyword);
 
     void validateTaskLimit();
 }

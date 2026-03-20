@@ -34,7 +34,11 @@ app:
 
 logging:
   level:
+    com.example.taskmanager.aspect: DEBUG
     com.example.taskmanager: DEBUG
     org.springframework.web: INFO
     org.hibernate.SQL: DEBUG
+    com.example.taskmanager.service: INFO
     org.hibernate.type.descriptor.sql: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"

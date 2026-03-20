@@ -31,7 +31,7 @@ public interface TaskRepository extends JpaRepository<Task,Long> {
 
     Page<Task> findAll(Pageable pageable);
     Page<Task> findByStatus(Status status, Pageable pageable);
-    Page<Task> findByPrority(Priority prority, Pageable pageable);
+    Page<Task> findByPriority(Priority prority, Pageable pageable);
 
     @Query("SELECT t.status, COUNT(t) FROM Task t GROUP BY t.status")
     List<Object[]> countTasksByStatus();

@@ -1,5 +1,8 @@
 package com.example.taskmanager.service;
 
+import com.example.taskmanager.annotation.Loggable;
+import com.example.taskmanager.dto.TaskRequest;
+import com.example.taskmanager.dto.TaskResponse;
 import com.example.taskmanager.exception.TaskNotFoundException;
 import com.example.taskmanager.model.Task;
 import com.example.taskmanager.model.Task.Priority;
@@ -15,8 +18,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -44,41 +45,63 @@ public class TaskServiceImpl implements TaskService {
         System.out.println("Завершение работы. Задач в БД: " + taskRepository.count());
     }
 
+    private TaskResponse toResponse(Task task) {
+        TaskResponse response = new TaskResponse();
+        response.setId(task.getId());
+        response.setTitle(task.getTitle());
+        response.setDescription(task.getDescription());
+        response.setPriority(task.getPriority().toString());
+        response.setStatus(task.getStatus().toString());
+        return response;
+    }
+
+    private Task toEntity(TaskRequest request) {
+        Task task = new Task();
+        task.setTitle(request.getTitle());
+        task.setDescription(request.getDescription());
+
+        Priority priority = request.getPriority();
+        if (priority == null) {priority = appProperties.getDefaultPriority();}
+
+        task.setPriority(priority);
+        task.setStatus(Status.NEW);
+        return task;
+    }
+
+    private void updateEntity(Task task, TaskRequest request) {
+        if (request.getTitle() != null && !request.getTitle().trim().isEmpty()) {
+            task.setTitle(request.getTitle());
+        }
+        if (request.getDescription() != null) {
+            task.setDescription(request.getDescription());
+        }
+        if (request.getPriority() != null) {
+            task.setPriority(request.getPriority());
+        }
+    }
     @Override
-    @Transactional
-    public Task createTask(String title, String description, Task.Priority priority) {
-        if (title == null || title.trim().isEmpty()) {
-            throw new IllegalArgumentException("Название задачи не может быть пустым!");
+    @Loggable
+    public TaskResponse createTask(TaskRequest request) {
+        if(request.getTitle() == null || request.getTitle().trim().isEmpty()) {
+            throw new IllegalArgumentException("Название задачи не может быть пустым");
         }
 
-        if (priority == null) {
-            priority = appProperties.getDefaultPriority();
-        }
+        validateTaskLimit();
 
-        Task task = new Task(title, description, priority);
+        Task task = toEntity(request);
         Task savedTask = taskRepository.save(task);
 
-        System.out.println("Задача сохранена в БД: " + savedTask);
-        return savedTask;
+        return toResponse(savedTask);
     }
 
 
     @Override
     @Transactional
-    public Task update(Long id, Task updatedTask) {
-        Task existingTask = taskRepository.findById(id).orElseThrow(() -> new TaskNotFoundException(id));
-
-        if (updatedTask.getTitle() != null && !updatedTask.getTitle().trim().isEmpty()) {
-            existingTask.setTittle(updatedTask.getTitle());
-        }
-        if (updatedTask.getDescription() != null) {
-            existingTask.setDescription(updatedTask.getDescription());
-        }
-        if (updatedTask.getPriority() != null) {
-            existingTask.setPrority(updatedTask.getPriority());
-        }
-
-        return taskRepository.save(existingTask);
+    public Optional<TaskResponse> update(Long id, TaskRequest request) {
+        return taskRepository.findById(id).map(task -> {
+            updateEntity(task, request);
+            return toResponse(taskRepository.save(task));
+        });
     }
 
     @Override
@@ -92,33 +115,44 @@ public class TaskServiceImpl implements TaskService {
 
 
     @Override
-    public List<Task> getAllTasks() {
-        return taskRepository.findAll();
+    @Loggable
+    public List<TaskResponse> getAllTasks() {
+        return taskRepository.findAll().stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
     }
 
     @Override
-    public Page<Task> getAllTasksPaged(int page, int size, String sortBy, String direction) {
+    public Page<TaskResponse> getAllTasksPaged(int page, int size, String sortBy, String direction) {
         Sort sort = direction.equalsIgnoreCase("desc")
                 ? Sort.by(sortBy).descending()
                 : Sort.by(sortBy).ascending();
 
         Pageable pageable = PageRequest.of(page, size, sort);
-        return taskRepository.findAll(pageable);
+        return taskRepository.findAll(pageable).map(this::toResponse);
     }
 
     @Override
-    public Optional<Task> findById(Long id) {
-        return taskRepository.findById(id);
+    public Optional<TaskResponse> findById(Long id) {
+        return taskRepository.findById(id).map(this::toResponse);
     }
 
     @Override
-    public List<Task> getTasksByStatus(Task.Status status) {
-        return taskRepository.findByStatus(status);
+    public List<TaskResponse> getTasksByStatus(Status status) {
+        return taskRepository.findByStatus(status).stream()
+                .map(this::toResponse).collect(Collectors.toList());
     }
 
     @Override
-    public List<Task> getTasksByPriority(Task.Priority priority) {
-        return taskRepository.findByPriority(priority);
+    public List<TaskResponse> getTasksByPriority(String priorityStr) {
+        try {
+            Priority priority = Priority.valueOf(priorityStr.toUpperCase());
+            return taskRepository.findByPriority(priority).stream()
+                    .map(this::toResponse)
+                    .collect(Collectors.toList());
+        } catch (IllegalArgumentException e) {
+            return List.of();
+        }
     }
 
     @Override
@@ -131,32 +165,29 @@ public class TaskServiceImpl implements TaskService {
 
 
     @Override
-    public List<Task> getAllWithFilters(String statusParam, String priorityParam) {
+    public List<TaskResponse> getAllWithFilters(String statusParam, String priorityParam) {
         if(statusParam != null && priorityParam != null) {
             try{
                 Status status = Status.valueOf(statusParam.toUpperCase());
                 Priority priority = Priority.valueOf(priorityParam.toUpperCase());
-                return taskRepository.findByStatusAndPriority(status, priority);
+                return taskRepository.findByStatusAndPriority(status, priority)
+                        .stream().map(this::toResponse).collect(Collectors.toList());
             }catch(IllegalArgumentException e){
                 return List.of();
             }
         }else if(statusParam != null) {
             try{
                 Status status = Status.valueOf(statusParam.toUpperCase());
-                return taskRepository.findByStatus(status);
+                return taskRepository.findByStatus(status).stream()
+                        .map(this::toResponse).collect(Collectors.toList());
             }catch(IllegalArgumentException e){
                 return List.of();
             }
         }else if(priorityParam != null) {
-            try{
-                Priority priority = Priority.valueOf(priorityParam.toUpperCase());
-                return taskRepository.findByPriority(priority);
-            }catch(IllegalArgumentException e){
-                return List.of();
-            }
+            return getTasksByPriority(priorityParam);
         }
 
-        return taskRepository.findAll();
+        return getAllTasks();
     }
 
 
@@ -178,33 +209,25 @@ public class TaskServiceImpl implements TaskService {
     public Map<String, Long> getStats() {
         List<Object[]> results = taskRepository.countTasksByStatus();
 
-        Map<String, Long> stats = new HashMap<>();
-        for(Object[] result: results){
-            Status status = (Status) result[0];
-            Long count  = (Long) result[1];
-            stats.put(status.name(), count);
-        }
+        Map<String, Long> stats = results.stream()
+                .collect(Collectors.toMap(
+                        result -> ((Status) result[0]).name(),
+                        result -> ((Long) result[1])
+                ));
+
 
         stats.put("TOTAL", taskRepository.count());
-
         return stats;
     }
 
-    public List<Task> searchByKeyword(String keyword){
+    public List<TaskResponse> searchByKeyword(String keyword){
         if(keyword == null || keyword.trim().isEmpty()){
-            return taskRepository.findAll();
+            return getAllTasks();
         }
-        return taskRepository.searchByKeyword(keyword);
+
+        return taskRepository.searchByKeyword(keyword).stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
     }
 
-    public Map<String, Long> getTodayStats() {
-        LocalDateTime startOfDay = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
-        List<Task> todayTasks = taskRepository.findByCreatedAtAfter(startOfDay);
-
-        return todayTasks.stream()
-                .collect(Collectors.groupingBy(
-                        task -> task.getStatus().name(),
-                        Collectors.counting()
-                ));
-    }
 }
